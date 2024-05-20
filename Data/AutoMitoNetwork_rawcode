@@ -1,1 +1,1203 @@
+classdef AutoMitoNetwork < matlab.apps.AppBase
 
+    % Properties that correspond to app components
+    properties (Access = public)
+        AutoMitoNetworkUIFigure         matlab.ui.Figure
+        AutoMitoNetworkLabel            matlab.ui.control.Label
+        Image3                          matlab.ui.control.Image
+        Image                           matlab.ui.control.Image
+        FilepathEditField               matlab.ui.control.EditField
+        FilepathEditFieldLabel          matlab.ui.control.Label
+        NumberofimagesEditField         matlab.ui.control.EditField
+        NumberofimagesEditFieldLabel    matlab.ui.control.Label
+        NumberofgraylevelsEditField     matlab.ui.control.EditField
+        NumberofgraylevelsEditFieldLabel  matlab.ui.control.Label
+        FileselectionLabel              matlab.ui.control.Label
+        AllowablemitochondriasizepixelsEditField  matlab.ui.control.NumericEditField
+        AllowablemitochondriasizepixelsEditFieldLabel  matlab.ui.control.Label
+        Tree3                           matlab.ui.container.CheckBoxTree
+        TexturefeaturesNode             matlab.ui.container.TreeNode
+        AngularsecondmomentenergyNode   matlab.ui.container.TreeNode
+        ContrastNode                    matlab.ui.container.TreeNode
+        CorrelationNode                 matlab.ui.container.TreeNode
+        VarianceNode                    matlab.ui.container.TreeNode
+        InversedifferencemomenthomogeneityNode  matlab.ui.container.TreeNode
+        SumaverageNode                  matlab.ui.container.TreeNode
+        SumvarianceNode                 matlab.ui.container.TreeNode
+        SumentropyNode                  matlab.ui.container.TreeNode
+        EntropyNode                     matlab.ui.container.TreeNode
+        DifferencevarianceNode          matlab.ui.container.TreeNode
+        DifferenceentropyNode           matlab.ui.container.TreeNode
+        InformationmeasureofcorrelationINode  matlab.ui.container.TreeNode
+        InformationmeasureofcorrelationIINode  matlab.ui.container.TreeNode
+        MaximumcorrelationcoefficientNode  matlab.ui.container.TreeNode
+        Tree2                           matlab.ui.container.CheckBoxTree
+        GraylevelintensityfeaturesNode  matlab.ui.container.TreeNode
+        MeanintensityNode               matlab.ui.container.TreeNode
+        MedianintensityNode             matlab.ui.container.TreeNode
+        StdintensityNode                matlab.ui.container.TreeNode
+        MinimumintensityNode            matlab.ui.container.TreeNode
+        MaximumintensityNode            matlab.ui.container.TreeNode
+        ModeNode                        matlab.ui.container.TreeNode
+        SkewnessNode                    matlab.ui.container.TreeNode
+        KurtosisNode                    matlab.ui.container.TreeNode
+        Tree                            matlab.ui.container.CheckBoxTree
+        ShapefeaturesNode               matlab.ui.container.TreeNode
+        AreaNode                        matlab.ui.container.TreeNode
+        PerimeterNode                   matlab.ui.container.TreeNode
+        MajoraxislengthNode             matlab.ui.container.TreeNode
+        MinoraxislengthNode             matlab.ui.container.TreeNode
+        EccentricityNode                matlab.ui.container.TreeNode
+        OrientationNode                 matlab.ui.container.TreeNode
+        ConvexareaNode                  matlab.ui.container.TreeNode
+        CircularityformfactorNode       matlab.ui.container.TreeNode
+        FilledareaNode                  matlab.ui.container.TreeNode
+        EulernumberNode                 matlab.ui.container.TreeNode
+        EquivalentdiameterNode          matlab.ui.container.TreeNode
+        SolidityNode                    matlab.ui.container.TreeNode
+        ExtentNode                      matlab.ui.container.TreeNode
+        MaximumferetdiameterNode        matlab.ui.container.TreeNode
+        MaximumferetangleNode           matlab.ui.container.TreeNode
+        MinimumferetdiameterNode        matlab.ui.container.TreeNode
+        MinimumferetangleNode           matlab.ui.container.TreeNode
+        InterconnectivityNode           matlab.ui.container.TreeNode
+        Fragmentation                   matlab.ui.container.TreeNode
+        OffsetEditField                 matlab.ui.control.EditField
+        OffsetEditFieldLabel            matlab.ui.control.Label
+        CalculateButton                 matlab.ui.control.Button
+        LoadimagesButton                matlab.ui.control.Button
+        ParametersLabel                 matlab.ui.control.Label
+        TexturefeaturesCheckBox         matlab.ui.control.CheckBox
+        FeatureselectionLabel           matlab.ui.control.Label
+        ScaleEditField                  matlab.ui.control.EditField
+        ScaleEditFieldLabel             matlab.ui.control.Label
+    end
+
+
+    properties (Access = private)
+        this = struct; % "Global" struct to pass on data
+        numberimages % Description
+        coloredLabels2 % Description
+        offset
+        numgreylevels
+    end
+
+
+    methods (Access = private)      %Haralick features function
+
+        function [x] = haralickTextureFeatures(coOcMat, xFeatures)
+            %Calculates all Haralick Features.
+            %
+            % Function call:
+            %   [x] = haralickTextureFeatures(coOcMat) calculates all 14 Haralick
+            %   Features
+            %	[x] = haralickTextureFeatures(coOcMat, xFeatures) calculates the
+            %	Haralick Features specified by xFeatures, the rest will be return as 0.
+            %	Use this for better legacy if you do not need all Haralick Features.
+            %
+            %
+            % Source:           http://haralick.org/journals/TexturalFeatures.pdf
+            %
+            %
+            % input:
+            %   'coOcMat'       Co-Occurence-Matrix,  which must be a [nxm] matrix,
+            %                   see matlab documentation glcm
+            %   'xFeatures'     (optional) - Feature(s), which should be calculated
+            %
+            % output:
+            %   'x' - [vector with the following feature(s):
+            %               x(1)  Angular Second Moment (Energy) [checked]
+            %               x(2)  Contrast [checked]
+            %               x(3)  Correlation [checked]
+            %               x(4)  Variance [checked]
+            %               x(5)  Inverse Difference Moment (Homogeneity) [checked]
+            %               x(6)  Sum Average [checked]
+            %               x(7)  Sum Variance [approxemitly (cut out zeros)]
+            %               x(8)  Sum Entropy [checked]
+            %               x(9)  Entropy [cut out zeros]
+            %               x(10) Difference Variance [approxemitly]
+            %               x(11) Difference Entropy [checked]
+            %               x(12) Information Measure of Correlation I [checked]
+            %               x(13) Information Measure of Correlation II [approxemitly]
+            %               x(14) Maximal Correlation Coefficient [validated, no reference]
+            %
+            %
+            %
+            %
+            % Notes:        If x14 Maximal Correlation Coefficient is complex then the
+            %               magnitude of MCC will be calculate.
+            %               See the haralick paper to understand the code.
+            %
+            % Info:         ver 1.1
+            %               - coOcMat will be checked if it is 2-dimensional
+            %               - Example code added
+            %               - more documentation
+            %               - fixed if-end polling (thanks to Ihsan Yassin)
+            %
+            %               ver 1.2
+            %               - fixed and validated Haralick Feature 14, still no
+            %               reference
+            %               - fixed problem with empty eigenvec matrix (thanks to Hafiz
+            %               Muhammad Arslan)
+            %
+            %               ver 1.3
+            %               - fixed feature 8 Sum Variance (thanks to Lingxuan Kong)
+            %
+            % Author:       Rune Monzel, runemonzel(at)gmail.com
+            %
+            % See also graycomatrix, graycoprops.
+
+
+            % check input
+            if nargin == 1
+                xFeatures = 1 : 14;
+            end
+
+            % check coOcMat for dimensions:
+            if ~(ismatrix(coOcMat))
+                error(['\coOcMatInput must be a two dimensional matrix, '...
+                    'dimensional was %s.',ndims(coOcMat)']);
+            end
+
+            % initialize x
+            x = zeros(14,1);
+
+            % normalize glcm
+            coOcMat = coOcMat./sum(coOcMat(:));
+
+            % Some pre-calculation:
+            % columns and rows
+            if sum(xFeatures == 2) == 1 | ... % Contrast
+                    sum(xFeatures == 3) == 1 | ... % Correlation
+                    sum(xFeatures == 4) == 1 | ... % Variance
+                    sum(xFeatures == 5) == 1 | ... % Inverse Difference Moment
+                    sum(xFeatures == 6) == 1 | ... % Sum Average
+                    sum(xFeatures == 7) == 1 | ... % Sum Variance
+                    sum(xFeatures == 8) == 1 | ... % Sum Entropy
+                    sum(xFeatures == 10) == 1 | ...% Difference Variance
+                    sum(xFeatures == 11) == 1 | ...% Difference Entropy
+                    sum(xFeatures == 14) == 1 % Maximal Correlation Coefficient
+                sizecoOcMat = size(coOcMat);
+                [col,row] = meshgrid(1:sizecoOcMat(1),1:sizecoOcMat(2));
+            end
+
+            % average and standarddeviation
+            if sum(xFeatures == 3) == 1 | ... % correlation
+                    sum(xFeatures == 10) == 1 % difference variance
+
+
+                rowMean =  sum( row(:).*coOcMat(:) );
+                colMean = sum( col(:).*coOcMat(:) );
+                rowStd = sqrt( sum( (row(:)-rowMean).^2 .* coOcMat(:) ) );
+                colStd = sqrt( sum( (col(:)-colMean).^2 .* coOcMat(:) ) );
+            end
+
+            % sum of rows p_y(i) und sum of columns p_x(j)
+            if sum(xFeatures == 12) == 1 |...% Information Measures of Correlation I
+                    sum(xFeatures == 13) == 1|... % Information Measures of Correlation II
+                    sum(xFeatures == 14) == 1 % Maximal Correlation Coefficient
+
+                rowCoOcMat = sum(coOcMat,2); %sum of rows p_y(i)
+                colCoOcMat = sum(coOcMat); %sum of columns p_x(i)
+            end
+
+            % p_x+y
+            if sum(xFeatures == 6)==1 |... % Sum Average
+                    sum(xFeatures == 7)==1 |... % Sum Variance
+                    sum(xFeatures == 8)==1 % Sum Entropy
+
+                start = -(sizecoOcMat(1) -1);
+                stop = sizecoOcMat(1) -1;
+
+                % Rotate Matrix 90°
+                coOcMat90 = rot90(coOcMat);
+
+                % Initilisiere p_x+y
+                p_XplusY = zeros((2*sizecoOcMat(1))-1,1);
+
+                k = 1;
+                for index = start : stop
+                    p_XplusY(k) = sum( diag(coOcMat90,index) );
+                    k = k + 1;
+                end
+            end
+
+            % Initialize  p_x-y
+            if sum(xFeatures == 10)==1 |... % Difference Variance
+                    sum(xFeatures == 11)==1 % Difference Entropy
+
+                start = 1;
+                stop = sizecoOcMat(1)-1;
+
+                % Initialize p_XminusY
+                p_XminusY = zeros(sizecoOcMat(1),1);
+                p_XminusY(1) = sum (diag(coOcMat,0) );
+
+                k = 2;
+                for index = start : stop
+                    p_XminusY(k) = sum( [diag(coOcMat,index);
+                        diag(coOcMat,-index)] );
+                    k = k + 1;
+                end
+            end
+
+
+            % Haralick Feature Calculations
+            for f = xFeatures
+                switch f
+                    case 1 % Energy (Angular Second Moment)
+                        x(1) = sum( coOcMat(:).^2 );
+
+                    case 2  % Contrast
+                        matrix = ( abs(row - col).^2 ) .* coOcMat;
+                        x(2) = sum( matrix(:) );
+
+                    case 3  % Correlation
+                        zaehler = sum ((row(:) - rowMean) .*...
+                            (col(:) - colMean) .*  coOcMat(:));
+                        denominator = rowStd * colStd;
+                        x(3) = zaehler/denominator;
+
+                    case 4 % Variance
+                        x(4) = sum( (row(:)-mean(coOcMat(:))).^2 .*coOcMat(:) );
+
+                    case 5 % Inverse Difference Moment
+                        x(5) = sum( coOcMat(:) ./ ( 1+ (row(:)-col(:)).^2 ) );
+
+                    case 6 % Sum Average
+                        x(6) = sum( (2:(2*sizecoOcMat(1)))' .* p_XplusY );
+
+                    case 7 % Sum Variance
+                        x(8) = - sum( p_XplusY(p_XplusY~=0) .* ...
+                            log(p_XplusY(p_XplusY~=0)) );
+
+                        x(7) = sum( ((2:(2*sizecoOcMat(1)))' -...
+                            x(8)).^2 .* p_XplusY  );
+
+                    case 8 % Sum Entropy
+                        if ~x(8) % if it is not calculate in case 7
+                            x(8) = - sum( p_XplusY(p_XplusY~=0) .*...
+                                log(p_XplusY(p_XplusY~=0)) );
+                        end
+
+                    case 9 % Entropy
+                        x(9) = - sum( coOcMat(coOcMat~=0) .*...
+                            log2(coOcMat(coOcMat~=0)) );
+
+                    case 10 % Difference Variance
+                        x(10) = sum( ((0:sizecoOcMat(1)-1)' -...
+                            mean(p_XminusY)).^2 .* p_XminusY);
+
+                    case 11 % Difference Entropy
+                        x(11) = - sum( p_XminusY(p_XminusY~=0) .*...
+                            log(p_XminusY(p_XminusY~=0)) );
+
+                    case 12 % Information Measures of Correlation I
+
+                        x(9) = - sum( coOcMat(coOcMat~=0) .*...
+                            log2(coOcMat(coOcMat~=0)) );
+
+                        % Cuto out all zeros:
+                        logrc  = log2( rowCoOcMat*colCoOcMat ); % 256x1 * 1x256
+                        %Matrixmultiplication
+                        logrc(logrc == -Inf) = 0; % cut out Inf
+                        HXY1 = - sum( coOcMat(:).* logrc(:) ); %product of elements
+                        % between co-occurence-matrix and the logarithmetic matrix
+                        numerator = x(9) - HXY1;
+
+                        % calculate off HX, Entropy of sum of columns
+                        logc = log2(colCoOcMat);
+                        logc(logc==-Inf) = 0;
+                        HX = - sum( colCoOcMat .* logc );
+
+                        % calculate off HY, Entropy of sum of columns
+                        logr = log2( rowCoOcMat );
+                        logr(logr==-Inf) = 0;
+                        HY = - sum( rowCoOcMat .* logr );
+
+                        % max value
+                        denominator = max([HX HY]);
+                        x(12) = numerator / denominator;
+
+                    case 13 % Information Measures of Correlation II
+                        if x(9)
+                            x(9) = - sum( coOcMat(coOcMat~=0) .*...
+                                log2(coOcMat(coOcMat~=0)) );
+                        end
+                        logrc  = log2( rowCoOcMat*colCoOcMat ); % 256x1 * 1x256
+                        %Matrixmultiplication
+                        logrc(logrc == -Inf) = 0;
+                        HXY2 = - sum( sum( (rowCoOcMat * colCoOcMat) .* logrc ));
+                        x(13) =  (  ( 1 - exp(-2*(HXY2 - x(9))) )  ).^(1/2);
+
+                    case 14 % Maximal Correlation Coefficient
+
+                        % Initialise Q
+                        Q = zeros(sizecoOcMat(1),sizecoOcMat(2));
+
+                        % Fast version  %SH changed i= to q =
+                        for q = 1 : sizecoOcMat(2)
+                            Q(q,:) = sum( ...
+                                (repmat(coOcMat(q,:),sizecoOcMat(1),1) .* coOcMat ) ./ ...
+                                repmat( rowCoOcMat(q) .* colCoOcMat, sizecoOcMat(1),1),...
+                                2,'omitnan');
+                        end
+
+                        % cut out nans
+                        Q(isnan(Q)) = 0;
+
+                        eigenvec = eig(Q);
+
+                        % Find largest eigenvec and delete
+                        eigenvec(eigenvec==max(eigenvec))=[];
+
+                        % If eigenvec is a zero matrix, no maximum can be found, that
+                        % would mean, that the second largest eigenvec of course is
+                        % also 0
+                        if ~any(eigenvec) || isempty(eigenvec)
+                            x(14) = sqrt(0);
+                            continue;
+                        end
+
+                        % Sqrt of second largest eigenvec
+                        x(14) = sqrt( max(eigenvec) );
+
+                        % calculate magnitude of Maximal Correlation Coefficient
+                        if imag(x(14))
+                            x(14) = abs(x(14));
+                        end
+
+                end
+            end
+        end
+
+
+    end
+
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Button pushed function: LoadimagesButton
+        function LoadimagesButtonPushed(app, event)
+            [filenameMito, pathnameMito] = uigetfile( ...
+                {'*.png','PNG-files (*.png)'}, ...
+                'Pick files', ...
+                'MultiSelect', 'on');
+            app.this.filenameMito = filenameMito;
+            app.this.pathnameMito = pathnameMito;
+
+
+
+
+            num_images = cellstr(filenameMito)
+            num_images = num2str(size(num_images,2));
+
+            % num_images = num2str(size(filenameMito,2));
+            app.NumberofimagesEditField.Value = num_images;
+
+            path = num2str(pathnameMito);
+            app.FilepathEditField.Value = path;
+
+
+            app.numberimages = str2double(num_images);
+
+
+            app.CalculateButton.Enable = "on";
+
+        end
+
+        % Button pushed function: CalculateButton
+        function CalculateButtonPushed(app, event)
+
+            try
+                app.CalculateButton.Enable = "off";
+                drawnow;
+
+                filenameMito = cellstr(app.this.filenameMito);
+                pathnameMito = app.this.pathnameMito ;
+
+                myFeatureSelect = {};
+                featureTree1 = findall(app.Tree,"Type","uitreenode");
+                myidx_shape = find(ismember(featureTree1,app.Tree.CheckedNodes));
+                iStart = size(myFeatureSelect,2);
+                for j = 1:size(myidx_shape,1)
+                    myFeatureSelect{j+iStart} = featureTree1(myidx_shape(j)).Text;
+                end
+
+                featureTree2 = findall(app.Tree2,"Type","uitreenode");
+                myidx_grey = find(ismember(featureTree2,app.Tree2.CheckedNodes));
+                iStart = size(myFeatureSelect,2);
+                for j = 1:size(myidx_grey,1)
+                    myFeatureSelect{j+iStart} = featureTree2(myidx_grey(j)).Text;
+                end
+
+
+                if size(myidx_shape,1) == 20
+                    myFeatureSelect(1)=[];
+                end
+
+                if size(myidx_grey,1) == 9
+                    Index = find(contains(myFeatureSelect,'Gray-level intensity features'));
+                    myFeatureSelect(Index)=[];
+                end
+
+
+                for i = 1:app.numberimages  %size(filenameMito,2)
+                    if  ~isequal(filenameMito,0)
+                        mitochondria_image = imread(fullfile(pathnameMito,filenameMito{i}));
+                        scale = str2double(app.ScaleEditField.Value);
+
+                        %% determining objects
+                        [mito_initial_objects, numberOfMito_initial] = bwlabel(mitochondria_image, 8);     % Label each mitochondria so we can calculate individual features
+
+                        % Each mitochondrial network is a different colour
+                        coloredLabels = label2rgb (mito_initial_objects, 'hsv', 'k', 'shuffle'); % pseudo random color labels
+
+                        %% properties e.g. area, intensity etc.
+
+                        props_initial = regionprops(mito_initial_objects, 'all');
+                        numberOfMito_initial = numel(props_initial);
+
+                        %% only keep objects above a certain size i.e. remove little things picked up
+
+                        allBlobAreas = [props_initial.Area];
+
+
+                        allowmitosize_in = app.AllowablemitochondriasizepixelsEditField.Value;
+
+                        if allowmitosize_in == 0
+                            allowmitosize = 1;
+                        else
+
+                            allowmitosize = ceil(allowmitosize_in);
+                        end
+
+                        allowableAreaIndexes = allBlobAreas>allowmitosize; %generally item is at least greater than 1000pixels
+                        keeperIndexes = find(allowableAreaIndexes);
+
+                        keep_cells_final = ismember(mito_initial_objects, keeperIndexes);
+                        [labeled_mito_final numberOfMito_final] = bwlabel(keep_cells_final, 8);     % Label each blob so we can make measurements of it
+                        coloredLabels2 = label2rgb (labeled_mito_final, 'hsv', 'k', 'shuffle'); % pseudo random color labels
+
+                        %Calculate morphological features
+                        shape_props = regionprops(labeled_mito_final,mitochondria_image,'all');
+
+                        %Calculate intensity features
+                        gray_props = regionprops(labeled_mito_final,mitochondria_image,{'Centroid','PixelValues','BoundingBox','WeightedCentroid'});
+
+                        app.Image.ImageSource = coloredLabels2;
+
+
+                        %% Shape and grey-level intensity features
+
+                        myFeatures = nan(numberOfMito_final,size(myFeatureSelect,2));
+                        for k = 1 : numberOfMito_final           % Loop through all blobs.
+                            for l = 1:size(myFeatureSelect,2)
+                                switch myFeatureSelect{l}
+                                    case 'Area'
+                                        blobArea(k) = shape_props(k).Area;                % Get area.
+                                        myFeatures(k,l) =  (blobArea(k))*(scale^2);
+
+                                    case 'Perimeter'
+                                        blobPerimeter(k) = shape_props(k).Perimeter;
+                                        myFeatures(k,l) = (blobPerimeter(k))*scale;
+
+                                    case 'Major axis length'
+                                        blobMajorAxisLength(k) = shape_props(k).MajorAxisLength;
+                                        myFeatures(k,l) = (blobMajorAxisLength(k))*scale;
+
+                                    case 'Minor axis length'
+                                        blobMinorAxisLength(k) = shape_props(k).MinorAxisLength;
+                                        myFeatures(k,l) = (blobMinorAxisLength(k))*scale;
+
+
+                                    case 'Eccentricity'
+                                        blobEccentricity(k) = shape_props(k).Eccentricity;
+                                        myFeatures(k,l) = (blobEccentricity(k));
+
+                                    case 'Orientation'
+                                        blobOrientation(k) = shape_props(k).Orientation;
+                                        myFeatures(k,l) = (blobOrientation(k));
+
+                                    case 'Convex area'
+                                        blobConvexArea(k) = shape_props(k).ConvexArea;
+                                        myFeatures(k,l) = (blobConvexArea(k))*scale^2;
+
+                                    case 'Circularity/form factor'
+                                        blobCircularity(k) = shape_props(k).Circularity;
+                                        mean_Circularity_adjusted(k) = blobCircularity(isfinite(blobCircularity(k)));
+                                        myFeatures(k,l) = (mean_Circularity_adjusted(k));
+
+
+                                    case 'Filled area'
+                                        blobFilledArea(k) = shape_props(k).FilledArea;
+                                        myFeatures(k,l) = (blobFilledArea(k))*scale^2;
+
+
+                                    case 'Euler number'
+                                        blobEulerNumber(k) = shape_props(k).EulerNumber;
+                                        myFeatures(k,l) = (blobEulerNumber(k));
+
+
+                                    case 'Equivalent diameter'
+                                        blobEquivDiameter(k) = shape_props(k).EquivDiameter;
+                                        myFeatures(k,l) = (blobEquivDiameter(k))*scale;
+
+
+                                    case 'Solidity'
+                                        blobSolidity(k) = shape_props(k).Solidity;
+                                        myFeatures(k,l) = (blobSolidity(k));
+
+
+                                    case 'Extent'
+                                        blobExtent(k) = shape_props(k).Extent;
+                                        myFeatures(k,l) = (blobExtent(k));
+
+
+                                    case 'Maximum feret diameter'
+                                        blobMaxFeretDiameter(k) = shape_props(k).MaxFeretDiameter;
+                                        myFeatures(k,l) = (blobMaxFeretDiameter(k))*scale;
+
+
+                                    case 'Maximum feret angle'
+                                        blobMaxFeretAngle(k) = shape_props(k).MaxFeretAngle;
+                                        myFeatures(k,l) = (blobMaxFeretAngle(k));
+
+                                    case 'Minimum feret diameter'
+                                        blobMinFeretDiameter(k) = shape_props(k).MinFeretDiameter;
+                                        myFeatures(k,l) = (blobMinFeretDiameter(k))*scale;
+
+
+                                    case 'Minimum feret angle'
+                                        blobMinFeretAngle(k) = shape_props(k).MinFeretAngle;
+                                        myFeatures(k,l) = (blobMinFeretAngle(k));
+
+
+                                    case 'Interconnectivity'
+                                        interconnectivity(k) = shape_props(k).Area/(shape_props(k).Perimeter);
+                                        myFeatures(k,l) = (interconnectivity(k));
+
+                                    case 'Fragmentation'
+                                        fragmentation(k) = 1/((shape_props(k).Area*shape_props(k).Perimeter)*scale^3);
+                                        myFeatures(k,l) = (fragmentation(k));
+
+
+                                        %intensity
+
+                                    case 'Mean intensity'
+                                        myFeatures(k,l) = mean(double(gray_props(k).PixelValues)/255);
+
+                                    case 'Median intensity'
+                                        myFeatures(k,l) = median(double(gray_props(k).PixelValues))/255;
+
+
+                                    case 'Std intensity'
+                                        myFeatures(k,l) = std(double(gray_props(k).PixelValues))/255;
+
+
+
+                                    case 'Minimum intensity'
+                                        myFeatures(k,l) = min(double(gray_props(k).PixelValues))/255;
+
+                                    case 'Maximum intensity'
+                                        myFeatures(k,l) = max(double(gray_props(k).PixelValues))/255;
+
+                                    case 'Mode'
+                                        myFeatures(k,l) = mode(double(gray_props(k).PixelValues))/255;
+
+                                    case 'Skewness'
+                                        myFeatures(k,l) = skewness(double(gray_props(k).PixelValues))/255;
+
+                                    case 'Kurtosis'
+                                        myFeatures(k,l) = kurtosis(double(gray_props(k).PixelValues))/255;
+                                end
+                            end
+                        end
+
+                        %% haralick features - texture
+
+                        if app.TexturefeaturesCheckBox.Value == 1
+
+                            offset2 = app.OffsetEditField.Value;
+                            numgreylevels2 = app.NumberofgraylevelsEditField.Value;
+
+                            offset2 = str2num(offset2);
+                            numgreylevels2 = str2num(numgreylevels2);
+
+
+                            myFeatureTextureSelect = {};
+                            featureTree3 = findall(app.Tree3,"Type","uitreenode");
+                            myidx_texture = find(ismember(featureTree3,app.Tree3.CheckedNodes));
+                            iStart2 = size(myFeatureTextureSelect,2);
+                            for v = 1:size(myidx_texture,1)
+                                myFeatureTextureSelect{v+iStart2} = featureTree3(myidx_texture(v)).Text;
+                            end
+
+                            if size(myidx_texture,1) == 15
+                                myFeatureTextureSelect(1)=[];
+                            end
+
+                            num_texture_features = length(myFeatureTextureSelect);
+
+
+                            myFeatures_texture = nan(numberOfMito_final,size(myFeatureTextureSelect,2));
+
+
+                            I = mat2gray(mitochondria_image);
+
+                            for k = 1 : numberOfMito_final           % Loop through all blobs.
+
+
+                                individual_mito_index = k;
+                                individual_mito_binary = ismember(labeled_mito_final,individual_mito_index);
+                                individual_mito = individual_mito_binary.*I;
+
+                                I2 = double(individual_mito);   %doing this to calculate co-occurence matrix only as it ignore values that
+                                %are NaN i.e. outside region of interest
+                                I2(I2==0) = NaN;
+
+                                GLCMs = graycomatrix(I2,'Offset',offset2,'Symmetric',...
+                                    true,'NumLevels',numgreylevels2,'GrayLimits',[0 1]);
+
+                                num_GLCM = size(offset2,1);
+
+                                for l = 1:size(myFeatureTextureSelect,2)
+                                    switch myFeatureTextureSelect{l}
+
+                                        case 'Angular second moment (energy)'
+                                            angularsecondmoment = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                angularsecondmoment(:,p) = haralickTextureFeatures(GLCMs(:,:,p),1);
+                                            end
+                                            myFeatures_texture(k,l) = mean(angularsecondmoment(1,:));
+
+
+                                        case 'Contrast'
+                                            contrast = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                contrast(:,p) = haralickTextureFeatures(GLCMs(:,:,p),2);
+                                            end
+                                            myFeatures_texture(k,l) = mean(contrast(2,:));
+
+                                        case 'Correlation'
+                                            Correlation = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Correlation(:,p) = haralickTextureFeatures(GLCMs(:,:,p),3);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Correlation(3,:));
+
+                                        case 'Variance'
+                                            Variance = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Variance(:,p) = haralickTextureFeatures(GLCMs(:,:,p),4);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Variance(4,:));
+
+                                        case 'Inverse difference moment (homogeneity)'
+                                            Inversedifferencemoment = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Inversedifferencemoment(:,p) = haralickTextureFeatures(GLCMs(:,:,p),5);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Inversedifferencemoment(5,:));
+
+                                        case 'Sum average'
+                                            Sumaverage = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Sumaverage(:,p) = haralickTextureFeatures(GLCMs(:,:,p),6);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Sumaverage(6,:));
+
+                                        case 'Sum variance'
+                                            Sumvariance = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Sumvariance(:,p) = haralickTextureFeatures(GLCMs(:,:,p),7);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Sumvariance(7,:));
+
+                                        case 'Sum entropy'
+                                            Sumentropy = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Sumentropy(:,p) = haralickTextureFeatures(GLCMs(:,:,p),8);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Sumentropy(8,:));
+
+                                        case 'Entropy'
+                                            Entropy = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Entropy(:,p) = haralickTextureFeatures(GLCMs(:,:,p),9);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Entropy(9,:));
+
+
+                                        case 'Difference variance'
+                                            Differencevariance = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Differencevariance(:,p) = haralickTextureFeatures(GLCMs(:,:,p),10);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Differencevariance(10,:));
+
+
+                                        case 'Difference entropy'
+                                            Differenceentropy = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Differenceentropy(:,p) = haralickTextureFeatures(GLCMs(:,:,p),11);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Differenceentropy(11,:));
+
+                                        case 'Information measure of correlation I'
+                                            InfomeasI = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                InfomeasI(:,p) = haralickTextureFeatures(GLCMs(:,:,p),12);
+                                            end
+                                            myFeatures_texture(k,l) = mean(InfomeasI(12,:));
+
+                                        case 'Information measure of correlation II'
+                                            InfomeasII = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                InfomeasII(:,p) = haralickTextureFeatures(GLCMs(:,:,p),13);
+                                            end
+                                            myFeatures_texture(k,l) = mean(InfomeasII(13,:));
+
+                                        case 'Maximum correlation coefficient'
+                                            Maxcorrcoeff = zeros(14,num_GLCM);
+                                            for p=1:num_GLCM
+                                                Maxcorrcoeff(:,p) = haralickTextureFeatures(GLCMs(:,:,p),14);
+                                            end
+                                            myFeatures_texture(k,l) = mean(Maxcorrcoeff(14,:));
+
+                                    end
+                                end
+                            end
+
+                        else
+                            myFeatures_texture = [];
+                            myFeatureTextureSelect = [];
+
+                        end
+
+
+                        myFeatureSelect_labels = [myFeatureSelect, myFeatureTextureSelect];
+                        matlab_features_per_mito_network = [myFeatures, myFeatures_texture];
+
+                        stats =  array2table(matlab_features_per_mito_network);
+                        stats.Properties.VariableNames = myFeatureSelect_labels;
+
+
+                        test = filenameMito{i};
+                        nameonly = test(1:end-4);
+                        filename = convertCharsToStrings(nameonly);
+
+                        %Save files
+                        save_filename  = fullfile(pathnameMito,append(filename,"_features_per_mitonetwork.xls"));
+                        imwrite(coloredLabels2,fullfile(pathnameMito,append(filename,"_mitomap.png")));
+
+                        writetable(stats,save_filename)
+
+
+                    end
+                end
+                app.CalculateButton.Enable = "on";
+
+            catch
+                app.CalculateButton.Text = "Error";
+            end
+
+        end
+
+        % Value changed function: TexturefeaturesCheckBox
+        function TexturefeaturesCheckBoxValueChanged(app, event)
+
+            if app.TexturefeaturesCheckBox.Value == 1
+
+                app.OffsetEditField.Enable = 1;
+                app.OffsetEditFieldLabel.Enable = 1;
+                app.NumberofgraylevelsEditField.Enable = 1;
+                app.NumberofgraylevelsEditFieldLabel.Enable = 1;
+                app.Tree3.Enable = 1;
+
+
+            else
+                app.OffsetEditField.Enable = 0;
+                app.NumberofgraylevelsEditField.Enable = 0;
+                app.Tree3.Enable = 0;
+
+            end
+
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Get the file path for locating images
+            pathToMLAPP = fileparts(mfilename('fullpath'));
+
+            % Create AutoMitoNetworkUIFigure and hide until all components are created
+            app.AutoMitoNetworkUIFigure = uifigure('Visible', 'off');
+            app.AutoMitoNetworkUIFigure.Color = [1 1 1];
+            app.AutoMitoNetworkUIFigure.Position = [100 100 968 719];
+            app.AutoMitoNetworkUIFigure.Name = 'AutoMitoNetwork';
+            app.AutoMitoNetworkUIFigure.Icon = fullfile(pathToMLAPP, 'mask_dilate_gray_white.png');
+
+            % Create ScaleEditFieldLabel
+            app.ScaleEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.ScaleEditFieldLabel.HorizontalAlignment = 'center';
+            app.ScaleEditFieldLabel.Position = [50 439 35 22];
+            app.ScaleEditFieldLabel.Text = 'Scale';
+
+            % Create ScaleEditField
+            app.ScaleEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'text');
+            app.ScaleEditField.HorizontalAlignment = 'center';
+            app.ScaleEditField.Position = [111 433 69 35];
+            app.ScaleEditField.Value = '1';
+
+            % Create FeatureselectionLabel
+            app.FeatureselectionLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.FeatureselectionLabel.FontSize = 18;
+            app.FeatureselectionLabel.FontWeight = 'bold';
+            app.FeatureselectionLabel.Position = [477 647 184 23];
+            app.FeatureselectionLabel.Text = 'Feature selection';
+
+            % Create TexturefeaturesCheckBox
+            app.TexturefeaturesCheckBox = uicheckbox(app.AutoMitoNetworkUIFigure);
+            app.TexturefeaturesCheckBox.ValueChangedFcn = createCallbackFcn(app, @TexturefeaturesCheckBoxValueChanged, true);
+            app.TexturefeaturesCheckBox.Text = 'Texture features';
+            app.TexturefeaturesCheckBox.FontSize = 14;
+            app.TexturefeaturesCheckBox.FontWeight = 'bold';
+            app.TexturefeaturesCheckBox.Position = [477 309 130 22];
+
+            % Create ParametersLabel
+            app.ParametersLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.ParametersLabel.FontSize = 18;
+            app.ParametersLabel.FontWeight = 'bold';
+            app.ParametersLabel.Position = [50 480 165 23];
+            app.ParametersLabel.Text = 'Parameters';
+
+            % Create LoadimagesButton
+            app.LoadimagesButton = uibutton(app.AutoMitoNetworkUIFigure, 'push');
+            app.LoadimagesButton.ButtonPushedFcn = createCallbackFcn(app, @LoadimagesButtonPushed, true);
+            app.LoadimagesButton.Position = [274 593 142 24];
+            app.LoadimagesButton.Text = 'Load images';
+
+            % Create CalculateButton
+            app.CalculateButton = uibutton(app.AutoMitoNetworkUIFigure, 'push');
+            app.CalculateButton.ButtonPushedFcn = createCallbackFcn(app, @CalculateButtonPushed, true);
+            app.CalculateButton.FontSize = 14;
+            app.CalculateButton.FontWeight = 'bold';
+            app.CalculateButton.Enable = 'off';
+            app.CalculateButton.Position = [96 64 235 70];
+            app.CalculateButton.Text = 'Calculate';
+
+            % Create OffsetEditFieldLabel
+            app.OffsetEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.OffsetEditFieldLabel.HorizontalAlignment = 'right';
+            app.OffsetEditFieldLabel.Enable = 'off';
+            app.OffsetEditFieldLabel.Position = [477 273 37 22];
+            app.OffsetEditFieldLabel.Text = 'Offset';
+
+            % Create OffsetEditField
+            app.OffsetEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'text');
+            app.OffsetEditField.HorizontalAlignment = 'center';
+            app.OffsetEditField.Enable = 'off';
+            app.OffsetEditField.Position = [529 273 139 22];
+            app.OffsetEditField.Value = '[0 1; -1 1;-1 0;-1 -1]';
+
+            % Create Tree
+            app.Tree = uitree(app.AutoMitoNetworkUIFigure, 'checkbox');
+            app.Tree.Position = [477 358 217 261];
+
+            % Create ShapefeaturesNode
+            app.ShapefeaturesNode = uitreenode(app.Tree);
+            app.ShapefeaturesNode.Text = 'Shape features';
+
+            % Create AreaNode
+            app.AreaNode = uitreenode(app.ShapefeaturesNode);
+            app.AreaNode.Text = 'Area';
+
+            % Create PerimeterNode
+            app.PerimeterNode = uitreenode(app.ShapefeaturesNode);
+            app.PerimeterNode.Text = 'Perimeter';
+
+            % Create MajoraxislengthNode
+            app.MajoraxislengthNode = uitreenode(app.ShapefeaturesNode);
+            app.MajoraxislengthNode.Text = 'Major axis length';
+
+            % Create MinoraxislengthNode
+            app.MinoraxislengthNode = uitreenode(app.ShapefeaturesNode);
+            app.MinoraxislengthNode.Text = 'Minor axis length';
+
+            % Create EccentricityNode
+            app.EccentricityNode = uitreenode(app.ShapefeaturesNode);
+            app.EccentricityNode.Text = 'Eccentricity';
+
+            % Create OrientationNode
+            app.OrientationNode = uitreenode(app.ShapefeaturesNode);
+            app.OrientationNode.Text = 'Orientation';
+
+            % Create ConvexareaNode
+            app.ConvexareaNode = uitreenode(app.ShapefeaturesNode);
+            app.ConvexareaNode.Text = 'Convex area';
+
+            % Create CircularityformfactorNode
+            app.CircularityformfactorNode = uitreenode(app.ShapefeaturesNode);
+            app.CircularityformfactorNode.Text = 'Circularity/form factor';
+
+            % Create FilledareaNode
+            app.FilledareaNode = uitreenode(app.ShapefeaturesNode);
+            app.FilledareaNode.Text = 'Filled area';
+
+            % Create EulernumberNode
+            app.EulernumberNode = uitreenode(app.ShapefeaturesNode);
+            app.EulernumberNode.Text = 'Euler number';
+
+            % Create EquivalentdiameterNode
+            app.EquivalentdiameterNode = uitreenode(app.ShapefeaturesNode);
+            app.EquivalentdiameterNode.Text = 'Equivalent diameter';
+
+            % Create SolidityNode
+            app.SolidityNode = uitreenode(app.ShapefeaturesNode);
+            app.SolidityNode.Text = 'Solidity';
+
+            % Create ExtentNode
+            app.ExtentNode = uitreenode(app.ShapefeaturesNode);
+            app.ExtentNode.Text = 'Extent';
+
+            % Create MaximumferetdiameterNode
+            app.MaximumferetdiameterNode = uitreenode(app.ShapefeaturesNode);
+            app.MaximumferetdiameterNode.Text = 'Maximum feret diameter';
+
+            % Create MaximumferetangleNode
+            app.MaximumferetangleNode = uitreenode(app.ShapefeaturesNode);
+            app.MaximumferetangleNode.Text = 'Maximum feret angle';
+
+            % Create MinimumferetdiameterNode
+            app.MinimumferetdiameterNode = uitreenode(app.ShapefeaturesNode);
+            app.MinimumferetdiameterNode.Text = 'Minimum feret diameter';
+
+            % Create MinimumferetangleNode
+            app.MinimumferetangleNode = uitreenode(app.ShapefeaturesNode);
+            app.MinimumferetangleNode.Text = 'Minimum feret angle';
+
+            % Create InterconnectivityNode
+            app.InterconnectivityNode = uitreenode(app.ShapefeaturesNode);
+            app.InterconnectivityNode.Text = 'Interconnectivity';
+
+            % Create Fragmentation
+            app.Fragmentation = uitreenode(app.ShapefeaturesNode);
+            app.Fragmentation.Text = 'Fragmentation';
+
+            % Create Tree2
+            app.Tree2 = uitree(app.AutoMitoNetworkUIFigure, 'checkbox');
+            app.Tree2.Position = [713 358 211 261];
+
+            % Create GraylevelintensityfeaturesNode
+            app.GraylevelintensityfeaturesNode = uitreenode(app.Tree2);
+            app.GraylevelintensityfeaturesNode.Text = 'Gray-level intensity features';
+
+            % Create MeanintensityNode
+            app.MeanintensityNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.MeanintensityNode.Text = 'Mean intensity';
+
+            % Create MedianintensityNode
+            app.MedianintensityNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.MedianintensityNode.Text = 'Median intensity';
+
+            % Create StdintensityNode
+            app.StdintensityNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.StdintensityNode.Text = 'Std intensity';
+
+            % Create MinimumintensityNode
+            app.MinimumintensityNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.MinimumintensityNode.Text = 'Minimum intensity';
+
+            % Create MaximumintensityNode
+            app.MaximumintensityNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.MaximumintensityNode.Text = 'Maximum intensity';
+
+            % Create ModeNode
+            app.ModeNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.ModeNode.Text = 'Mode';
+
+            % Create SkewnessNode
+            app.SkewnessNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.SkewnessNode.Text = 'Skewness';
+
+            % Create KurtosisNode
+            app.KurtosisNode = uitreenode(app.GraylevelintensityfeaturesNode);
+            app.KurtosisNode.Text = 'Kurtosis';
+
+            % Create Tree3
+            app.Tree3 = uitree(app.AutoMitoNetworkUIFigure, 'checkbox');
+            app.Tree3.Enable = 'off';
+            app.Tree3.Position = [477 42 447 209];
+
+            % Create TexturefeaturesNode
+            app.TexturefeaturesNode = uitreenode(app.Tree3);
+            app.TexturefeaturesNode.Text = 'Texture features';
+
+            % Create AngularsecondmomentenergyNode
+            app.AngularsecondmomentenergyNode = uitreenode(app.TexturefeaturesNode);
+            app.AngularsecondmomentenergyNode.Text = 'Angular second moment (energy)';
+
+            % Create ContrastNode
+            app.ContrastNode = uitreenode(app.TexturefeaturesNode);
+            app.ContrastNode.Text = 'Contrast';
+
+            % Create CorrelationNode
+            app.CorrelationNode = uitreenode(app.TexturefeaturesNode);
+            app.CorrelationNode.Text = 'Correlation';
+
+            % Create VarianceNode
+            app.VarianceNode = uitreenode(app.TexturefeaturesNode);
+            app.VarianceNode.Text = 'Variance';
+
+            % Create InversedifferencemomenthomogeneityNode
+            app.InversedifferencemomenthomogeneityNode = uitreenode(app.TexturefeaturesNode);
+            app.InversedifferencemomenthomogeneityNode.Text = 'Inverse difference moment (homogeneity)';
+
+            % Create SumaverageNode
+            app.SumaverageNode = uitreenode(app.TexturefeaturesNode);
+            app.SumaverageNode.Text = 'Sum average';
+
+            % Create SumvarianceNode
+            app.SumvarianceNode = uitreenode(app.TexturefeaturesNode);
+            app.SumvarianceNode.Text = 'Sum variance';
+
+            % Create SumentropyNode
+            app.SumentropyNode = uitreenode(app.TexturefeaturesNode);
+            app.SumentropyNode.Text = 'Sum entropy';
+
+            % Create EntropyNode
+            app.EntropyNode = uitreenode(app.TexturefeaturesNode);
+            app.EntropyNode.Text = 'Entropy';
+
+            % Create DifferencevarianceNode
+            app.DifferencevarianceNode = uitreenode(app.TexturefeaturesNode);
+            app.DifferencevarianceNode.Text = 'Difference variance';
+
+            % Create DifferenceentropyNode
+            app.DifferenceentropyNode = uitreenode(app.TexturefeaturesNode);
+            app.DifferenceentropyNode.Text = 'Difference entropy';
+
+            % Create InformationmeasureofcorrelationINode
+            app.InformationmeasureofcorrelationINode = uitreenode(app.TexturefeaturesNode);
+            app.InformationmeasureofcorrelationINode.Text = 'Information measure of correlation I';
+
+            % Create InformationmeasureofcorrelationIINode
+            app.InformationmeasureofcorrelationIINode = uitreenode(app.TexturefeaturesNode);
+            app.InformationmeasureofcorrelationIINode.Text = 'Information measure of correlation II';
+
+            % Create MaximumcorrelationcoefficientNode
+            app.MaximumcorrelationcoefficientNode = uitreenode(app.TexturefeaturesNode);
+            app.MaximumcorrelationcoefficientNode.Text = 'Maximum correlation coefficient';
+
+            % Create AllowablemitochondriasizepixelsEditFieldLabel
+            app.AllowablemitochondriasizepixelsEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.AllowablemitochondriasizepixelsEditFieldLabel.HorizontalAlignment = 'right';
+            app.AllowablemitochondriasizepixelsEditFieldLabel.Position = [50 394 196 22];
+            app.AllowablemitochondriasizepixelsEditFieldLabel.Text = 'Allowable mitochondria size (pixels)';
+
+            % Create AllowablemitochondriasizepixelsEditField
+            app.AllowablemitochondriasizepixelsEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'numeric');
+            app.AllowablemitochondriasizepixelsEditField.Limits = [0 Inf];
+            app.AllowablemitochondriasizepixelsEditField.HorizontalAlignment = 'center';
+            app.AllowablemitochondriasizepixelsEditField.Position = [261 387 94 35];
+            app.AllowablemitochondriasizepixelsEditField.Value = 1;
+
+            % Create FileselectionLabel
+            app.FileselectionLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.FileselectionLabel.FontSize = 18;
+            app.FileselectionLabel.FontWeight = 'bold';
+            app.FileselectionLabel.Position = [50 647 123 23];
+            app.FileselectionLabel.Text = 'File selection';
+
+            % Create NumberofgraylevelsEditFieldLabel
+            app.NumberofgraylevelsEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.NumberofgraylevelsEditFieldLabel.HorizontalAlignment = 'right';
+            app.NumberofgraylevelsEditFieldLabel.Enable = 'off';
+            app.NumberofgraylevelsEditFieldLabel.Position = [713 273 122 22];
+            app.NumberofgraylevelsEditFieldLabel.Text = 'Number of gray levels';
+
+            % Create NumberofgraylevelsEditField
+            app.NumberofgraylevelsEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'text');
+            app.NumberofgraylevelsEditField.HorizontalAlignment = 'center';
+            app.NumberofgraylevelsEditField.Enable = 'off';
+            app.NumberofgraylevelsEditField.Position = [850 273 54 22];
+            app.NumberofgraylevelsEditField.Value = '8';
+
+            % Create NumberofimagesEditFieldLabel
+            app.NumberofimagesEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.NumberofimagesEditFieldLabel.HorizontalAlignment = 'right';
+            app.NumberofimagesEditFieldLabel.Position = [50 594 103 22];
+            app.NumberofimagesEditFieldLabel.Text = 'Number of images';
+
+            % Create NumberofimagesEditField
+            app.NumberofimagesEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'text');
+            app.NumberofimagesEditField.Editable = 'off';
+            app.NumberofimagesEditField.HorizontalAlignment = 'center';
+            app.NumberofimagesEditField.Position = [180 588 67 35];
+            app.NumberofimagesEditField.Value = '0';
+
+            % Create FilepathEditFieldLabel
+            app.FilepathEditFieldLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.FilepathEditFieldLabel.HorizontalAlignment = 'right';
+            app.FilepathEditFieldLabel.Position = [50 547 51 22];
+            app.FilepathEditFieldLabel.Text = 'File path';
+
+            % Create FilepathEditField
+            app.FilepathEditField = uieditfield(app.AutoMitoNetworkUIFigure, 'text');
+            app.FilepathEditField.Editable = 'off';
+            app.FilepathEditField.Position = [116 542 302 31];
+
+            % Create Image
+            app.Image = uiimage(app.AutoMitoNetworkUIFigure);
+            app.Image.Position = [43 145 342 215];
+
+            % Create Image3
+            app.Image3 = uiimage(app.AutoMitoNetworkUIFigure);
+            app.Image3.Position = [795 638 85 74];
+            app.Image3.ImageSource = fullfile(pathToMLAPP, 'mask_dilate_gray_white.png');
+
+            % Create AutoMitoNetworkLabel
+            app.AutoMitoNetworkLabel = uilabel(app.AutoMitoNetworkUIFigure);
+            app.AutoMitoNetworkLabel.HorizontalAlignment = 'center';
+            app.AutoMitoNetworkLabel.FontName = 'Arial Black';
+            app.AutoMitoNetworkLabel.FontSize = 16;
+            app.AutoMitoNetworkLabel.FontWeight = 'bold';
+            app.AutoMitoNetworkLabel.Position = [867 646 102 74];
+            app.AutoMitoNetworkLabel.Text = {'AutoMito'; 'Network'};
+
+            % Show the figure after all components are created
+            app.AutoMitoNetworkUIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = AutoMitoNetwork
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.AutoMitoNetworkUIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.AutoMitoNetworkUIFigure)
+        end
+    end
+end
